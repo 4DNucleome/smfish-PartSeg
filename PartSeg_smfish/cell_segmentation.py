@@ -134,6 +134,9 @@ class SMAlgorithmCell(SMAlgorithmNuc):
             thr_val,
             max_val,
         )
+        for i in range(1, components_num+1):
+            closed = close_small_holes(new_segment == i, self.new_parameters["close_holes_size"])
+            new_segment[closed > 0] = i
 
         segmentation = np.concatenate([new_segment for _ in range(self.image.layers)])
         return SegmentationResult(
