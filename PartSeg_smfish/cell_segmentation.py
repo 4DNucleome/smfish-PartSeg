@@ -1,4 +1,6 @@
 import operator
+import typing
+from abc import ABC
 from copy import deepcopy
 from typing import Callable
 
@@ -13,6 +15,52 @@ from PartSegCore.segmentation.algorithm_base import SegmentationResult, Addition
 from PartSegCore.segmentation.segmentation_algorithm import StackAlgorithm, close_small_holes
 from PartSegCore.segmentation.threshold import threshold_dict, BaseThreshold
 from PartSegCore.segmentation.watershed import sprawl_dict, BaseWatershed
+
+
+class SingleLayerBase(AlgorithmDescribeBase, ABC):
+    @classmethod
+    def calculate_layer(cls, array:np.ndarray, axis: str, parameters: dict) -> np.ndarray:
+        raise NotImplementedError()
+
+
+class MaxProjection(SingleLayerBase):
+
+    @classmethod
+    def calculate_layer(cls, array: np.ndarray, axis: str, parameters: dict) -> np.ndarray:
+        return np.max(array, axis=axis.index("Z"))
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "Maximum projection"
+
+    @classmethod
+    def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
+        return []
+
+
+class MidArrayProjection(SingleLayerBase):
+
+    @classmethod
+    def calculate_layer(cls, array: np.ndarray, axis: str, parameters: dict) -> np.ndarray:
+        slices = [slice(None) for _ in range(array.ndim)]
+        z_axis = axis.index("Z")
+        index = array.shape[z_axis] // 2
+        slices[z_axis] = index
+        return array[tuple(slices)]
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "Maximum projection"
+
+    @classmethod
+    def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
+        return []
+
+
+select_layer = {
+    MaxProjection.get_name(): MaxProjection,
+    MidArrayProjection.get_name(): MidArrayProjection,
+}
 
 
 class SMAlgorithmNuc(StackAlgorithm):
@@ -33,6 +81,13 @@ class SMAlgorithmNuc(StackAlgorithm):
     @classmethod
     def get_fields(cls):
         return [
+            AlgorithmProperty(
+                "layer",
+                "Layer method",
+                next(iter(select_layer.keys())),
+                possible_values=select_layer,
+                property_type=AlgorithmDescribeBase,
+            ),
             AlgorithmProperty("nucleus", "Nucleus channel", 0, property_type=Channel),
             AlgorithmProperty("nuc_gauss", "Filtering radius", 3, [0, 20]),
             AlgorithmProperty(
@@ -51,8 +106,9 @@ class SMAlgorithmNuc(StackAlgorithm):
         if self.image is None:
             raise ValueError("image not set")
         nucleus_channel = self.image.get_channel(self.new_parameters["nucleus"])
-        max_nucleus_projection = np.max(nucleus_channel, axis=self.image.stack_pos)
-        gauss = gaussian(max_nucleus_projection, self.new_parameters["nuc_gauss"])
+        nucleus_projection = select_layer[self.new_parameters["layer"]["name"]].\
+            calculate_layer(nucleus_channel, self.image.return_order.replace("C", ""))
+        gauss = gaussian(nucleus_projection, self.new_parameters["nuc_gauss"])
         edges = skimage.filters.sobel(gauss)
         threshold_algorithm: BaseThreshold = threshold_dict[self.new_parameters["nuc_threshold"]["name"]]
         mask, self.nuc_thr_info = threshold_algorithm.calculate_mask(edges, None, self.new_parameters["nuc_threshold"]["values"], operator.ge)
@@ -69,7 +125,7 @@ class SMAlgorithmNuc(StackAlgorithm):
             segmentation=segmentation,
             parameters=self.get_segmentation_profile(),
             additional_layers={
-                "projection nucleus": AdditionalLayerDescription(data=max_nucleus_projection, layer_type="image"),
+                "projection nucleus": AdditionalLayerDescription(data=nucleus_projection, layer_type="image"),
                 "edges nucleus": AdditionalLayerDescription(data=gauss, layer_type="image"),
                 "core_objects": AdditionalLayerDescription(data=core_objects, layer_type="labels"),
             },
@@ -111,8 +167,9 @@ class SMAlgorithmCell(SMAlgorithmNuc):
             raise ValueError("image not set")
         res = super().calculation_run(report_fun)
         cell_channel = self.image.get_channel(self.new_parameters["cell"])
-        max_cell_projection = np.max(cell_channel, axis=self.image.stack_pos)
-        gauss = gaussian(max_cell_projection, self.new_parameters["cell_gauss"])
+        cell_projection = select_layer[self.new_parameters["layer"]["name"]]. \
+            calculate_layer(cell_channel, self.image.return_order.replace("C", ""))
+        gauss = gaussian(cell_projection, self.new_parameters["cell_gauss"])
         edges = skimage.filters.sobel(gauss)
         threshold_algorithm: BaseThreshold = threshold_dict[self.new_parameters["cell_threshold"]["name"]]
         mask, thr_val = threshold_algorithm.calculate_mask(edges, None, self.new_parameters["cell_threshold"]["values"], operator.ge)
@@ -143,7 +200,7 @@ class SMAlgorithmCell(SMAlgorithmNuc):
             segmentation=segmentation,
             parameters=self.get_segmentation_profile(),
             additional_layers={
-                "projection cell": AdditionalLayerDescription(data=max_cell_projection, layer_type="image"),
+                "projection cell": AdditionalLayerDescription(data=cell_projection, layer_type="image"),
                 "edges cell": AdditionalLayerDescription(data=gauss, layer_type="image"),
                 "mask": AdditionalLayerDescription(data=mask, layer_type="labels"),
                 "new_segment": AdditionalLayerDescription(data=new_segment, layer_type="labels"),
