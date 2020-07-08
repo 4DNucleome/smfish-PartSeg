@@ -50,7 +50,7 @@ class MidArrayProjection(SingleLayerBase):
 
     @classmethod
     def get_name(cls) -> str:
-        return "Maximum projection"
+        return "Mid layer"
 
     @classmethod
     def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
@@ -107,7 +107,7 @@ class SMAlgorithmNuc(StackAlgorithm):
             raise ValueError("image not set")
         nucleus_channel = self.image.get_channel(self.new_parameters["nucleus"])
         nucleus_projection = select_layer[self.new_parameters["layer"]["name"]].\
-            calculate_layer(nucleus_channel, self.image.return_order.replace("C", ""))
+            calculate_layer(nucleus_channel, self.image.return_order.replace("C", ""), self.new_parameters["layer"]["values"])
         gauss = gaussian(nucleus_projection, self.new_parameters["nuc_gauss"])
         edges = skimage.filters.sobel(gauss)
         threshold_algorithm: BaseThreshold = threshold_dict[self.new_parameters["nuc_threshold"]["name"]]
@@ -168,7 +168,7 @@ class SMAlgorithmCell(SMAlgorithmNuc):
         res = super().calculation_run(report_fun)
         cell_channel = self.image.get_channel(self.new_parameters["cell"])
         cell_projection = select_layer[self.new_parameters["layer"]["name"]]. \
-            calculate_layer(cell_channel, self.image.return_order.replace("C", ""))
+            calculate_layer(cell_channel, self.image.return_order.replace("C", ""), self.new_parameters["layer"]["values"])
         gauss = gaussian(cell_projection, self.new_parameters["cell_gauss"])
         edges = skimage.filters.sobel(gauss)
         threshold_algorithm: BaseThreshold = threshold_dict[self.new_parameters["cell_threshold"]["name"]]
