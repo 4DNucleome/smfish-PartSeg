@@ -10,8 +10,13 @@ from PartSegCore.segmentation.threshold import BaseThreshold
 
 class ScaledOtsu(BaseThreshold):
     @classmethod
-    def calculate_mask(cls, data: np.ndarray, mask: typing.Optional[np.ndarray], arguments: dict,
-                       operator: typing.Callable[[object, object], bool]):
+    def calculate_mask(
+        cls,
+        data: np.ndarray,
+        mask: typing.Optional[np.ndarray],
+        arguments: dict,
+        operator: typing.Callable[[object, object], bool],
+    ):
         if arguments["masked"] and mask is not None:
             otsu_value = skimage.filters.threshold_otsu(data[mask > 0])
         else:
