@@ -36,8 +36,14 @@ class PeakSegment(RestartableAlgorithm):
         if restarted or self.parameters["background_gauss"] != self.new_parameters["background_gauss"]:
             self.parameters["background_gauss"] = self.new_parameters["background_gauss"]
             restarted = True
+            if self.mask is not None:
+                data = np.copy(self.channel)
+                background_val = np.mean(self.channel[self.mask > 0])
+                data[self.mask == 0] = background_val
+            else:
+                data = self.channel
             self.background_removed = self.channel.astype(np.float64) - gaussian(
-                self.channel, self.new_parameters["background_gauss"]
+                data, self.new_parameters["background_gauss"]
             )
         if restarted or self.parameters["signal_gauss"] != self.new_parameters["signal_gauss"]:
             self.parameters["signal_gauss"] = self.new_parameters["signal_gauss"]
@@ -142,5 +148,5 @@ class PeakSegment(RestartableAlgorithm):
                 property_type=AlgorithmDescribeBase,
             ),
             AlgorithmProperty("minimum_size", "Minimum size (px)", 5, (0, 10 ** 6), 5),
-            AlgorithmProperty("maximum_size", "Maximum size (px)", 5, (0, 10 ** 6), 1000),
+            AlgorithmProperty("maximum_size", "Maximum size (px)", 1000, (0, 10 ** 6), 5),
         ]
