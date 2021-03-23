@@ -3,7 +3,6 @@ import typing
 import numpy as np
 import skimage.filters
 
-
 from PartSegCore.algorithm_describe_base import AlgorithmProperty
 from PartSegCore.segmentation.threshold import BaseThreshold
 

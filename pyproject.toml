@@ -29,3 +29,9 @@ exclude = '''
   | package/PartSeg/version.py
 )
 '''
+
+[tool.isort]
+line_length=120
+known_first_party=['PartSeg', 'PartSegData','PartSegCore','PartSegImage', 'PartSegCore_compiled_backend']
+profile="black"
+src_paths=["package"]

@@ -7,12 +7,12 @@ from typing import Callable
 import numpy as np
 import SimpleITK
 
-from PartSegCore.algorithm_describe_base import AlgorithmProperty, AlgorithmDescribeBase
+from PartSegCore.algorithm_describe_base import AlgorithmDescribeBase, AlgorithmProperty
 from PartSegCore.channel_class import Channel
 from PartSegCore.image_operations import gaussian
 from PartSegCore.segmentation import RestartableAlgorithm
-from PartSegCore.segmentation.algorithm_base import SegmentationResult, AdditionalLayerDescription
-from PartSegCore.segmentation.threshold import threshold_dict, BaseThreshold
+from PartSegCore.segmentation.algorithm_base import AdditionalLayerDescription, SegmentationResult
+from PartSegCore.segmentation.threshold import BaseThreshold, threshold_dict
 from PartSegCore.utils import bisect
 
 
@@ -71,8 +71,11 @@ class PeakSegment(RestartableAlgorithm):
             self.segmentation = SimpleITK.GetArrayFromImage(SimpleITK.RelabelComponent(connect))
             self._sizes_array = np.bincount(self.segmentation.flat)
             restarted = True
-        if restarted or self.new_parameters["minimum_size"] != self.parameters["minimum_size"] or \
-                self.new_parameters["maximum_size"] != self.parameters["maximum_size"]:
+        if (
+            restarted
+            or self.new_parameters["minimum_size"] != self.parameters["minimum_size"]
+            or self.new_parameters["maximum_size"] != self.parameters["maximum_size"]
+        ):
             self.parameters["minimum_size"] = self.new_parameters["minimum_size"]
             self.parameters["maximum_size"] = self.new_parameters["maximum_size"]
             minimum_size = self.new_parameters["minimum_size"]
@@ -82,7 +85,7 @@ class PeakSegment(RestartableAlgorithm):
             finally_segment = np.copy(self.segmentation)
             finally_segment[finally_segment > ind] = 0
             finally_segment[finally_segment <= ind2] = 0
-            finally_segment[finally_segment > 0] - (ind2-1)
+            finally_segment[finally_segment > 0] - (ind2 - 1)
             self.components_num = ind - ind2
             self.indexes = (ind2, ind)
             if ind == 0:
@@ -127,7 +130,7 @@ class PeakSegment(RestartableAlgorithm):
 
     def get_info_text(self):
         return f"Threshold: {self.threshold_info}\nSizes: " + ", ".join(
-            map(str, self._sizes_array[self.indexes[0]+1: self.indexes[1]+1])
+            map(str, self._sizes_array[self.indexes[0] + 1 : self.indexes[1] + 1])
         )
 
     @classmethod

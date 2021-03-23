@@ -1,9 +1,9 @@
-from PartSegCore.register import register as _register
 from PartSegCore.register import RegisterEnum
+from PartSegCore.register import register as _register
 
-from .cell_segmentation import SMAlgorithmNuc, SMAlgorithmCell, SMAlgorithmSelect
-from .threshold import ScaledOtsu
+from .cell_segmentation import SMAlgorithmCell, SMAlgorithmNuc, SMAlgorithmSelect
 from .peak_segment import PeakSegment
+from .threshold import ScaledOtsu
 
 
 def register():

@@ -5,17 +5,17 @@ from copy import deepcopy
 from typing import Callable
 
 import numpy as np
-import skimage.filters
 import SimpleITK as sitk
+import skimage.filters
 
-from PartSegCore.algorithm_describe_base import AlgorithmProperty, AlgorithmDescribeBase, SegmentationProfile
+from PartSegCore.algorithm_describe_base import AlgorithmDescribeBase, AlgorithmProperty, SegmentationProfile
 from PartSegCore.channel_class import Channel
 from PartSegCore.image_operations import gaussian
-from PartSegCore.segmentation.algorithm_base import SegmentationResult, AdditionalLayerDescription
+from PartSegCore.segmentation.algorithm_base import AdditionalLayerDescription, SegmentationResult
 from PartSegCore.segmentation.noise_filtering import noise_filtering_dict
 from PartSegCore.segmentation.segmentation_algorithm import StackAlgorithm, close_small_holes
-from PartSegCore.segmentation.threshold import threshold_dict, BaseThreshold
-from PartSegCore.segmentation.watershed import sprawl_dict, BaseWatershed
+from PartSegCore.segmentation.threshold import BaseThreshold, threshold_dict
+from PartSegCore.segmentation.watershed import BaseWatershed, sprawl_dict
 
 
 class SingleLayerBase(AlgorithmDescribeBase, ABC):
@@ -117,7 +117,8 @@ class SMAlgorithmNuc(StackAlgorithm):
         mask = close_small_holes(mask, self.new_parameters["close_holes_size"])
         core_objects = sitk.GetArrayFromImage(
             sitk.RelabelComponent(
-                sitk.ConnectedComponent(sitk.GetImageFromArray(mask), True), self.new_parameters["minimum_size"],
+                sitk.ConnectedComponent(sitk.GetImageFromArray(mask), True),
+                self.new_parameters["minimum_size"],
             )
         )
         segmentation = np.concatenate([core_objects for _ in range(self.image.layers)])
@@ -235,7 +236,11 @@ class SMAlgorithmSelect(StackAlgorithm):
     @classmethod
     def get_fields(cls):
         return [
-            AlgorithmProperty("layer", "Layer number", 0,),
+            AlgorithmProperty(
+                "layer",
+                "Layer number",
+                0,
+            ),
             AlgorithmProperty("nucleus", "Nucleus channel", 0, property_type=Channel),
             AlgorithmProperty(
                 "noise_filtering_nuc",
@@ -295,7 +300,8 @@ class SMAlgorithmSelect(StackAlgorithm):
         mask = close_small_holes(mask, self.new_parameters["close_holes_size"])
         core_objects = sitk.GetArrayFromImage(
             sitk.RelabelComponent(
-                sitk.ConnectedComponent(sitk.GetImageFromArray(mask), True), self.new_parameters["minimum_size"],
+                sitk.ConnectedComponent(sitk.GetImageFromArray(mask), True),
+                self.new_parameters["minimum_size"],
             )
         )
         cell_channel = self.image.get_channel(self.new_parameters["cell"])
