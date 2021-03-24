@@ -19,6 +19,7 @@ def register():
     from PartSegCore.register import register as register_fun
 
     register_fun(segmentation.SMSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
+    register_fun(segmentation.SMLaplacianSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
 
 
 @napari_hook_implementation
