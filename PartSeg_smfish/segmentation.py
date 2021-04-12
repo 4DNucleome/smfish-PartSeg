@@ -83,7 +83,7 @@ class SMSegmentationBase(SegmentationAlgorithm):
         label_types.update({i: "Mixed" for i in mixed_components})
 
         annotation = {el: {"voxels": sizes[el], "type": label_types[el], "number": el} for el in elements}
-        position_masking = np.zeros((elements.max() if elements.size > 0 else 0) + 1, dtype=molecule_segmentation.dtype)
+        position_masking = np.zeros((np.max(elements) if elements.size > 0 else 0) + 1, dtype=molecule_segmentation.dtype)
         for el in cellular_components:
             position_masking[el] = 1
         for el in mixed_components:
@@ -213,7 +213,7 @@ def gauss_background_estimate(
         resp[resp < 0] = 0
     resp = resp.reshape((1, ) + resp.shape)
     # return it + some layer properties
-    return resp, {"colormap": "gray", "scale": image.scale, "name": "Signal estimate"}
+    return LayerDataTuple((resp, {"colormap": "gray", "scale": image.scale, "name": "Signal estimate"}))
 
 
 def _gauss_background_estimate(channel:np.ndarray, mask:np.ndarray, scale: Union[List[float], Tuple[Union[float, int]]], background_gauss_radius: float, foreground_gauss_radius: float) -> np.ndarray:
@@ -239,17 +239,17 @@ def laplacian_estimate(image: Image, mask: Labels, radius=1.30, clip_bellow_0=Tr
     if clip_bellow_0:
         res[res < 0] = 0
     res = res.reshape(image.data.shape)
-    return res, {"colormap": "magma", "scale": image.scale, "name": "Laplacian estimate"}
+    return LayerDataTuple((res, {"colormap": "magma", "scale": image.scale, "name": "Laplacian estimate"}))
 
 
-def _laplacian_estimate(channel: np.ndarray, mask:np.ndarray,  radius=1.30) -> np.ndarray:
+def _laplacian_estimate(channel: np.ndarray, mask: np.ndarray,  radius=1.30) -> np.ndarray:
     data = channel.astype(np.float64)
     mean_background = np.mean(data[mask > 0])
     data[mask == 0] = mean_background
     data = gaussian(data, 15, False)
     data[mask>0] = channel[mask > 0]
-    res = -SimpleITK.GetArrayFromImage(SimpleITK.LaplacianRecursiveGaussian(SimpleITK.GetImageFromArray(data), radius))
-    return res
+    return -SimpleITK.GetArrayFromImage(SimpleITK.LaplacianRecursiveGaussian(SimpleITK.GetImageFromArray(data), radius))
+
 
 
 def laplacian_check(image: Image, mask: Labels, radius=1.0, threshold=10.0, min_size=50) -> LayerDataTuple:
@@ -268,4 +268,4 @@ def laplacian_check(image: Image, mask: Labels, radius=1.0, threshold=10.0, min_
         )
     )
     labeling = labeling.reshape((1,) + data.shape)
-    return labeling, {"scale": image.scale, "name": "Signal estimate"}
+    return LayerDataTuple((labeling, {"scale": image.scale, "name": "Signal estimate"}))
