@@ -1,24 +1,20 @@
 import operator
 import typing
 from copy import deepcopy
-from typing import Callable, List, Union, Tuple
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import SimpleITK
-from PartSegCore.image_operations import gaussian
 from napari.layers import Image, Labels
 from napari.types import LayerDataTuple
 
 from PartSegCore.algorithm_describe_base import AlgorithmDescribeBase, AlgorithmProperty, ROIExtractionProfile
 from PartSegCore.channel_class import Channel
 from PartSegCore.convex_fill import convex_fill
+from PartSegCore.image_operations import gaussian
 from PartSegCore.segmentation import SegmentationAlgorithm
 from PartSegCore.segmentation.algorithm_base import AdditionalLayerDescription, SegmentationResult
-from PartSegCore.segmentation.noise_filtering import (
-    DimensionType,
-    GaussNoiseFiltering,
-    noise_filtering_dict,
-)
+from PartSegCore.segmentation.noise_filtering import DimensionType, GaussNoiseFiltering, noise_filtering_dict
 from PartSegCore.segmentation.threshold import BaseThreshold, threshold_dict
 
 
@@ -33,7 +29,6 @@ class SMSegmentationBase(SegmentationAlgorithm):
 
     def background_estimate(self, channel: np.ndarray) -> np.ndarray:
         raise NotImplementedError
-
 
     def calculation_run(self, report_fun: Callable[[str, int], None]) -> SegmentationResult:
         channel_nuc = self.get_channel(self.new_parameters["channel_nuc"])
@@ -71,7 +66,7 @@ class SMSegmentationBase(SegmentationAlgorithm):
         cellular_components = set(np.unique(molecule_segmentation[nucleus_segmentation == 0]))
         if 0 in cellular_components:
             cellular_components.remove(0)
-        nucleus_components = set(np.unique(molecule_segmentation[nucleus_segmentation >0]))
+        nucleus_components = set(np.unique(molecule_segmentation[nucleus_segmentation > 0]))
         if 0 in nucleus_components:
             nucleus_components.remove(0)
         mixed_components = cellular_components & nucleus_components
@@ -83,7 +78,9 @@ class SMSegmentationBase(SegmentationAlgorithm):
         label_types.update({i: "Mixed" for i in mixed_components})
 
         annotation = {el: {"voxels": sizes[el], "type": label_types[el], "number": el} for el in elements}
-        position_masking = np.zeros((np.max(elements) if elements.size > 0 else 0) + 1, dtype=molecule_segmentation.dtype)
+        position_masking = np.zeros(
+            (np.max(elements) if elements.size > 0 else 0) + 1, dtype=molecule_segmentation.dtype
+        )
         for el in cellular_components:
             position_masking[el] = 1
         for el in mixed_components:
@@ -150,7 +147,13 @@ class SMSegmentation(SMSegmentationBase):
 
     def background_estimate(self, channel: np.ndarray) -> np.ndarray:
         mask = self.mask if self.mask is not None else channel > 0
-        return _gauss_background_estimate(channel, mask, self.image.spacing, self.new_parameters["background_estimate_radius"], self.new_parameters["foreground_estimate_radius"])
+        return _gauss_background_estimate(
+            channel,
+            mask,
+            self.image.spacing,
+            self.new_parameters["background_estimate_radius"],
+            self.new_parameters["foreground_estimate_radius"],
+        )
 
     @classmethod
     def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
@@ -158,11 +161,11 @@ class SMSegmentation(SMSegmentationBase):
         res.insert(
             -2,
             AlgorithmProperty(
-               "background_estimate_radius",
-               "Background estimate radius",
-               5.0,
+                "background_estimate_radius",
+                "Background estimate radius",
+                5.0,
                 (0, 20),
-           )
+            ),
         )
         res.insert(
             -2,
@@ -171,9 +174,10 @@ class SMSegmentation(SMSegmentationBase):
                 "Foreground estimate radius",
                 2.5,
                 (0, 20),
-            )
+            ),
         )
         return res
+
 
 class SMLaplacianSegmentation(SMSegmentationBase):
     @classmethod
@@ -194,7 +198,7 @@ class SMLaplacianSegmentation(SMSegmentationBase):
                 "Laplacian radius",
                 1.3,
                 (0, 20),
-           )
+            ),
         )
         return res
 
@@ -208,20 +212,28 @@ def gauss_background_estimate(
 ) -> LayerDataTuple:
     # process the image
     mask = mask.data if mask is not None else np.ones(image.data.shape, dtype=np.uint8)
-    resp = _gauss_background_estimate(image.data[0], mask[0], image.scale[1:], background_gauss_radius, foreground_gauss_radius)
+    resp = _gauss_background_estimate(
+        image.data[0], mask[0], image.scale[1:], background_gauss_radius, foreground_gauss_radius
+    )
     if remove_negative:
         resp[resp < 0] = 0
-    resp = resp.reshape((1, ) + resp.shape)
+    resp = resp.reshape((1,) + resp.shape)
     # return it + some layer properties
     return LayerDataTuple((resp, {"colormap": "gray", "scale": image.scale, "name": "Signal estimate"}))
 
 
-def _gauss_background_estimate(channel:np.ndarray, mask:np.ndarray, scale: Union[List[float], Tuple[Union[float, int]]], background_gauss_radius: float, foreground_gauss_radius: float) -> np.ndarray:
+def _gauss_background_estimate(
+    channel: np.ndarray,
+    mask: np.ndarray,
+    scale: Union[List[float], Tuple[Union[float, int]]],
+    background_gauss_radius: float,
+    foreground_gauss_radius: float,
+) -> np.ndarray:
     data = channel.astype(np.float64)
     mean_background = np.mean(data[mask > 0])
     data[mask == 0] = mean_background
     data = gaussian(data, 15, False)
-    data[mask>0] = channel[mask > 0]
+    data[mask > 0] = channel[mask > 0]
     background_estimate = GaussNoiseFiltering.noise_filter(
         data, scale, {"dimension_type": DimensionType.Layer, "radius": background_gauss_radius}
     )
@@ -242,14 +254,13 @@ def laplacian_estimate(image: Image, mask: Labels, radius=1.30, clip_bellow_0=Tr
     return LayerDataTuple((res, {"colormap": "magma", "scale": image.scale, "name": "Laplacian estimate"}))
 
 
-def _laplacian_estimate(channel: np.ndarray, mask: np.ndarray,  radius=1.30) -> np.ndarray:
+def _laplacian_estimate(channel: np.ndarray, mask: np.ndarray, radius=1.30) -> np.ndarray:
     data = channel.astype(np.float64)
     mean_background = np.mean(data[mask > 0])
     data[mask == 0] = mean_background
     data = gaussian(data, 15, False)
-    data[mask>0] = channel[mask > 0]
+    data[mask > 0] = channel[mask > 0]
     return -SimpleITK.GetArrayFromImage(SimpleITK.LaplacianRecursiveGaussian(SimpleITK.GetImageFromArray(data), radius))
-
 
 
 def laplacian_check(image: Image, mask: Labels, radius=1.0, threshold=10.0, min_size=50) -> LayerDataTuple:

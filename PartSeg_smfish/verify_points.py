@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from itertools import product
 from typing import List
 
@@ -56,9 +55,8 @@ def _shift_array(points_to_roi: int, ndim: int) -> np.ndarray:
             for x, y in product(range(-points_to_roi, points_to_roi + 1), repeat=2)
             if x ** 2 + y ** 2 <= points_to_roi ** 2
         ],
-        dtype=np.uint16
+        dtype=np.uint16,
     )
-
 
 
 class MatchResults:
@@ -73,8 +71,10 @@ class MatchResults:
 
     def __repr__(self):
         matched_points_count = sum(self.matched_points)
-        return f"MatchResults(ignored={self.ignored}, matched {matched_points_count} of {len(self.matched_points)}, " \
-               f"labels_preserved {np.count_nonzero(self.labels_preserve)} of {len(self.labels_preserve)})"
+        return (
+            f"MatchResults(ignored={self.ignored}, matched {matched_points_count} of {len(self.matched_points)}, "
+            f"labels_preserved {np.count_nonzero(self.labels_preserve)} of {len(self.labels_preserve)})"
+        )
 
 
 def verify_sm_segmentation(
@@ -82,7 +82,7 @@ def verify_sm_segmentation(
     points: np.ndarray,
     points_dist: int = 2,
     points_to_roi: int = 1,
-    ignore_single_points: bool = True
+    ignore_single_points: bool = True,
 ) -> MatchResults:
     points_grouped = group_points(points, points_dist)
     result = MatchResults(points_grouped, set(np.unique(segmentation)))
@@ -117,13 +117,15 @@ def verify_segmentation(
     ignore_single_points: bool = True,
     info: str = "",
 ) -> List[types.LayerDataTuple]:
-    match_result = verify_sm_segmentation(segmentation.data, points.data, points_dist, points_to_roi, ignore_single_points)
+    match_result = verify_sm_segmentation(
+        segmentation.data, points.data, points_dist, points_to_roi, ignore_single_points
+    )
     all_labels = np.count_nonzero(np.unique(segmentation.data))
-
 
     verify_segmentation.info.value = (
         f"matched {np.sum(match_result.matched_points)} of {len(match_result.matched_points)}"
-        f"\nconsumed {all_labels - len(match_result.labels)} of {all_labels} segmentation components" + f"\nignored {match_result.ignored}"
+        f"\nconsumed {all_labels - len(match_result.labels)} of {all_labels} segmentation components"
+        + f"\nignored {match_result.ignored}"
         if ignore_single_points
         else ""
     )
@@ -132,7 +134,11 @@ def verify_segmentation(
         if not ok:
             res.extend(points_group)
 
-    missed_labels = (match_result.labels_preserve[segmentation.data], {"name": "Missed ROI", "scale": points.scale}, "labels")
+    missed_labels = (
+        match_result.labels_preserve[segmentation.data],
+        {"name": "Missed ROI", "scale": points.scale},
+        "labels",
+    )
     missed_points = (
         np.array(res) if res else None,
         {"name": "Missed points", "scale": points.scale, "face_color": "red", "ndim": segmentation.data.ndim},
