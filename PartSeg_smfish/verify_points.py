@@ -3,22 +3,22 @@ from typing import List
 
 import numpy as np
 from magicgui import magic_factory
-from napari import types
 from napari.layers import Labels, Points
+from napari.types import LayerDataTuple
 from scipy.spatial.distance import cdist
 
 
 def group_points(points: np.ndarray, max_dist=1) -> List[List[np.ndarray]]:
     points = np.copy(points)
-    points[:, 1] = np.round(points[:, 1])
-    sort = np.argsort(points[:, 1])
+    points[:, -3] = np.round(points[:, -3])
+    sort = np.argsort(points[:, -3])
     points = points[sort]
-    max_val = points[-1, 1]
-    prev_data = points[points[:, 1] == 0]
+    max_val = points[-1, -3]
+    prev_data = points[points[:, -3] == 0]
     point_groups = []
     index_info = {}
     for i in range(1, int(max_val + 1)):
-        new_points = points[points[:, 1] == i]
+        new_points = points[points[:, -3] == i]
 
         if new_points.size == 0 or prev_data.size == 0:
             index_info = {}
@@ -28,7 +28,7 @@ def group_points(points: np.ndarray, max_dist=1) -> List[List[np.ndarray]]:
             prev_data = new_points
             continue
         new_index_info = {}
-        dist_array = cdist(prev_data[:, 2:], new_points[:, 2:])
+        dist_array = cdist(prev_data[:, -2:], new_points[:, -2:])
         close_object = dist_array < max_dist
         consumed_set = set()
         close_indices = np.nonzero(close_object)
@@ -116,7 +116,7 @@ def verify_segmentation(
     points_to_roi: int = 1,
     ignore_single_points: bool = True,
     info: str = "",
-) -> List[types.LayerDataTuple]:
+) -> List[LayerDataTuple]:
     match_result = verify_sm_segmentation(
         segmentation.data, points.data, points_dist, points_to_roi, ignore_single_points
     )
@@ -145,4 +145,21 @@ def verify_segmentation(
         "points",
     )
 
-    return [missed_points, missed_labels]
+    return [LayerDataTuple(missed_points), LayerDataTuple(missed_labels)]
+
+
+@magic_factory(info={"widget_type": "TextEdit"}, call_button=True)
+def find_single_points(
+    points: Points,
+    points_dist: int = 2,
+    info: str = "",
+) -> LayerDataTuple:
+    points_grouped = group_points(points.data, points_dist)
+    points_res = [x[0] for x in points_grouped if len(x) == 1]
+    find_single_points.info.value = (
+        f"Single points count: {len(points_res)} of {len(points_grouped)}, ratio {len(points_res)/len(points_grouped)}"
+    )
+    points_res = np.array(points_res) if points_res else None
+    return LayerDataTuple(
+        (points_res, {"name": "Single points", "scale": points.scale, "face_color": "green"}, "points")
+    )

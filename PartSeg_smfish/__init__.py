@@ -3,7 +3,7 @@ from napari_plugin_engine import napari_hook_implementation
 from . import segmentation
 from .copy_labels import CopyLabelWidget
 from .segmentation import gauss_background_estimate, laplacian_check, laplacian_estimate
-from .verify_points import verify_segmentation
+from .verify_points import find_single_points, verify_segmentation
 
 if "reload" in globals():
     import importlib
@@ -45,3 +45,8 @@ def napari_experimental_provide_function3():
 @napari_hook_implementation(specname="napari_experimental_provide_dock_widget")
 def napari_experimental_provide_dock_widget2():
     return verify_segmentation, {"name": "Verify Segmentation"}
+
+
+@napari_hook_implementation(specname="napari_experimental_provide_dock_widget")
+def napari_experimental_provide_dock_widget3():
+    return find_single_points, {"name": "Single points"}
