@@ -42,7 +42,7 @@ jobs:
           python -m pip install -r ../PartSeg/requirements/requirements_pyinstaller.txt
           python -m pip install ../PartSeg
       - name: Bundle
-        run: python  ../PartSeg/build_utils/create_and_pack_executable.py .
+        run: python  ../PartSeg/build_utils/create_and_pack_executable.py
       - name: Show
         run: |
           ls
@@ -52,4 +52,4 @@ jobs:
         uses: actions/upload-artifact@v1
         with:
           name: execs
-          path: dist2
+          path: ../PartSeg/dist2
