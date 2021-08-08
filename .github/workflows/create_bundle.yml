@@ -7,7 +7,6 @@ jobs:
   bundle:
     name: Bundle
     runs-on: ${{ matrix.os }}
-    needs: download_data
     strategy:
       fail-fast: false
       matrix:
