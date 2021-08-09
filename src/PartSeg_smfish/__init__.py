@@ -1,3 +1,5 @@
+import sys
+
 from napari_plugin_engine import napari_hook_implementation
 
 from . import segmentation
@@ -20,6 +22,11 @@ def register():
 
     register_fun(segmentation.SMSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
     register_fun(segmentation.SMLaplacianSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
+
+    if getattr(sys, "frozen", False):
+        import napari
+
+        napari.plugins.plugin_manager.register(sys.modules[__name__])
 
 
 @napari_hook_implementation
