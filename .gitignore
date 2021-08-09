@@ -1,4 +1,4 @@
-PartSeg_smfish/version.py
+src/PartSeg_smfish/version.py
 dist2
 # Created by https://www.toptal.com/developers/gitignore/api/vim,code,jupyternotebooks,pycharm+all,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=vim,code,jupyternotebooks,pycharm+all,python
