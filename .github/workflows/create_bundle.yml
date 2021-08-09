@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           repository: '4DNucleome/PartSeg'
-          ref: master
+          ref: feature/build_with_plugins
           path: PartSeg
       - uses: actions/setup-python@v1
         name: Install Python 3.8
@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v1
         with:
           name: execs
-          path: ../PartSeg/dist2
+          path: dist2
       - name: Upload test data2
         uses: actions/upload-artifact@v1
         with:
