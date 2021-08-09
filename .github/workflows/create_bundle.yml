@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04 ] #, windows-2019, macos-10.15 ]
+        os: [ ubuntu-20.04, windows-2019, macos-10.15 ]
     steps:
       - uses: actions/checkout@v1
       - uses: actions/checkout@v1
@@ -41,6 +41,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install -r ../PartSeg/requirements/requirements_pyinstaller.txt
           python -m pip install ../PartSeg
+          python -m pip install .
       - name: Bundle
         run: python  ../PartSeg/build_utils/create_and_pack_executable.py
       - name: Show
@@ -53,8 +54,3 @@ jobs:
         with:
           name: execs
           path: dist2
-      - name: Upload test data2
-        uses: actions/upload-artifact@v1
-        with:
-          name: dist
-          path: dist
