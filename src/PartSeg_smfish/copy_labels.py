@@ -32,12 +32,17 @@ class CopyLabelWidget(QWidget):
 
         self.setLayout(layout)
 
-        self.viewer.events.active_layer.connect(self.activate_widget)
+        self.viewer.layers.selection.events.active.connect(self.activate_widget)
         self.copy_btn.clicked.connect(self.copy_action)
+        if isinstance(self.viewer.layers.selection.active, Labels):
+            self._update_items(self.viewer.layers.selection.active)
 
     def activate_widget(self, event):
-        self.setVisible(isinstance(event.value, Labels))
-        if isinstance(event.value, Labels):
+        is_labels = isinstance(event.value, Labels)
+        if is_labels and not self.isVisible():
+            self._update_items(event.value)
+        self.setVisible(is_labels)
+        if is_labels:
             event.value.events.set_data.connect(self._shallow_update)
             event.value.events.selected_label.connect(self.update_items)
 
@@ -49,7 +54,10 @@ class CopyLabelWidget(QWidget):
         self.refresh()
 
     def update_items(self, event):
-        unique = np.unique(event.source.data)
+        self._update_items(event.source)
+
+    def _update_items(self, layer):
+        unique = np.unique(layer.data)
         if unique[0] == 0:
             unique = unique[1:]
         self._components = set(unique)
@@ -84,6 +92,6 @@ class CopyLabelWidget(QWidget):
         for component_num in checked:
             mask = layer.data[0, z_position] == component_num
             start = max(0, self.lower.value())
-            end = min(layer.data.shape[1], self.upper.value()) + 1
+            end = min(layer.data.shape[1]-1, self.upper.value()) + 1
             for i in range(start, end):
                 layer.data[0, i][mask] = component_num
