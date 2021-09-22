@@ -12,13 +12,13 @@ from PartSegCore.algorithm_describe_base import AlgorithmDescribeBase, Algorithm
 from PartSegCore.channel_class import Channel
 from PartSegCore.convex_fill import convex_fill
 from PartSegCore.image_operations import gaussian
-from PartSegCore.segmentation import SegmentationAlgorithm
+from PartSegCore.segmentation import ROIExtractionAlgorithm
 from PartSegCore.segmentation.algorithm_base import AdditionalLayerDescription, SegmentationResult
 from PartSegCore.segmentation.noise_filtering import DimensionType, GaussNoiseFiltering, noise_filtering_dict
 from PartSegCore.segmentation.threshold import BaseThreshold, threshold_dict
 
 
-class SMSegmentationBase(SegmentationAlgorithm):
+class SMSegmentationBase(ROIExtractionAlgorithm):
     @classmethod
     def support_time(cls):
         return False
