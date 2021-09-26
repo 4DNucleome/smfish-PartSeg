@@ -13,9 +13,11 @@ from PartSegCore.channel_class import Channel
 from PartSegCore.convex_fill import convex_fill
 from PartSegCore.image_operations import gaussian
 from PartSegCore.segmentation import ROIExtractionAlgorithm
-from PartSegCore.segmentation.algorithm_base import AdditionalLayerDescription, SegmentationResult
+from PartSegCore.segmentation.algorithm_base import AdditionalLayerDescription, ROIExtractionResult, SegmentationResult
 from PartSegCore.segmentation.noise_filtering import DimensionType, GaussNoiseFiltering, noise_filtering_dict
+from PartSegCore.segmentation.segmentation_algorithm import CellFromNucleusFlow, StackAlgorithm
 from PartSegCore.segmentation.threshold import BaseThreshold, threshold_dict
+from PartSegImage import Image as PSImage
 
 
 class SMSegmentationBase(ROIExtractionAlgorithm):
@@ -280,3 +282,73 @@ def laplacian_check(image: Image, mask: Labels, radius=1.0, threshold=10.0, min_
     )
     labeling = labeling.reshape((1,) + data.shape)
     return LayerDataTuple((labeling, {"scale": image.scale, "name": "Signal estimate"}))
+
+
+class LayerRangeThresholdFlow(StackAlgorithm):
+    def get_info_text(self):
+        return ""
+
+    def get_segmentation_profile(self) -> ROIExtractionProfile:
+        return ROIExtractionProfile("", self.get_name(), deepcopy(self.new_parameters))
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "Maximum projection Threshold Flow"
+
+    @classmethod
+    def get_fields(cls):
+        return [
+            AlgorithmProperty("lower_layer", "Lower Layer", 0, options_range=(-1, 1000)),
+            AlgorithmProperty("upper_layer", "Upper Layer", -1, options_range=(-1, 1000)),
+        ] + CellFromNucleusFlow.get_fields()
+
+    @staticmethod
+    def get_steps_num():
+        return CellFromNucleusFlow.get_steps_num() + 2
+
+    def calculation_run(self, report_fun: Callable[[str, int], None]) -> ROIExtractionResult:
+        count = [0]
+
+        def report_fun_wrap(text, num):
+            report_fun(text, num + 1)
+            count[0] = num + 1
+
+        report_fun("Maximum projection", 0)
+        lower_layer = self.new_parameters["lower_layer"]
+        upper_layer = self.new_parameters["upper_layer"]
+        if upper_layer < 0:
+            upper_layer = self.image.shape[self.image.stack_pos] - upper_layer
+        upper_layer += 1
+        slice_arr = [slice(None) for _ in self.image.axis_order]
+        slice_arr[self.image.stack_pos] = slice(lower_layer, upper_layer)
+        slice_arr.pop(self.image.channel_pos)
+        image: PSImage = self.image.substitute(mask=self.mask).cut_image(slice_arr, frame=0)
+
+        new_data = np.max(image.get_data(), axis=image.stack_pos)
+        mask = np.min(image.mask, axis=image.get_array_axis_positions()["Z"]) if image.mask is not None else None
+        image = PSImage(new_data, image.spacing[1:], mask=mask, axes_order=image.axis_order.replace("Z", ""))
+
+        segment_method = CellFromNucleusFlow()
+        segment_method.set_image(image)
+        segment_method.set_mask(image.mask)
+        parameters = dict(self.new_parameters)
+        del parameters["lower_layer"]
+        del parameters["upper_layer"]
+        segment_method.set_parameters(**parameters)
+        partial_res = segment_method.calculation_run(report_fun_wrap)
+
+        report_fun("Copy layers", count[0] + 1)
+        res_roi = np.zeros(self.image.get_channel(0).shape, dtype=partial_res.roi.dtype)
+        base_index = (slice(None),) * (self.image.stack_pos)
+        for i in range(lower_layer, upper_layer):
+            res_roi[base_index + (i,)] = partial_res.roi
+
+        report_fun("Prepare result", count[0] + 2)
+        additional_layer = {
+            "maximum_projection": AdditionalLayerDescription(new_data, "image", "maximum projection"),
+            **partial_res.additional_layers,
+        }
+
+        return ROIExtractionResult(
+            roi=res_roi, parameters=self.get_segmentation_profile(), additional_layers=additional_layer
+        )

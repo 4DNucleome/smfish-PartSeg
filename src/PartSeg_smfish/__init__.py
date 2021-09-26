@@ -16,12 +16,12 @@ reload = False
 
 
 def register():
-
     from PartSegCore.register import RegisterEnum
     from PartSegCore.register import register as register_fun
 
     register_fun(segmentation.SMSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
     register_fun(segmentation.SMLaplacianSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
+    register_fun(segmentation.LayerRangeThresholdFlow, RegisterEnum.roi_mask_segmentation_algorithm)
 
     if getattr(sys, "frozen", False):
         import napari
