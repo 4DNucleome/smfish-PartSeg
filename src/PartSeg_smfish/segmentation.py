@@ -352,3 +352,20 @@ class LayerRangeThresholdFlow(StackAlgorithm):
         return ROIExtractionResult(
             roi=res_roi, parameters=self.get_segmentation_profile(), additional_layers=additional_layer
         )
+
+
+def maximum_projection(
+    image: Image, lower_layer: int = 0, upper_layer: int = 1, axis_num: int = PSImage.get_array_axis_positions()["Z"]
+) -> LayerDataTuple:
+    data = image.data
+    slice_arr = [slice(None) for _ in data.shape]
+    if upper_layer < 0:
+        upper_layer = data.shape[axis_num] - upper_layer
+    upper_layer += 1
+    slice_arr[axis_num] = slice(lower_layer, upper_layer)
+    res = np.max(data[tuple(slice_arr)], axis=axis_num)
+    shape = list(data.shape)
+    shape[axis_num] = 1
+    return LayerDataTuple(
+        (res.reshape(shape), {"colormap": "magma", "scale": image.scale, "name": "Maximum projection"})
+    )
