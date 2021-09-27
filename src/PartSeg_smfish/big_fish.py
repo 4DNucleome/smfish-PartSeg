@@ -1,9 +1,10 @@
 import typing
 from typing import Callable
 
-from bigfish import detection
+from bigfish import detection, stack
 from napari.layers import Image
 from napari.types import LayerDataTuple
+from napari.qt import progress
 
 from PartSegCore.algorithm_describe_base import AlgorithmProperty, ROIExtractionProfile
 from PartSegCore.segmentation import ROIExtractionAlgorithm, ROIExtractionResult
@@ -39,14 +40,20 @@ class BigFishSpotDetector(ROIExtractionAlgorithm):
         ]
 
 
-def spot_detect(image: Image, psf_z: float = 400, psf_yx: float = 100) -> LayerDataTuple:
-    spots, threshold = detection.detect_spots(
-        image.data.squeeze(),
-        return_threshold=True,
-        voxel_size_z=image.scale[1],
-        voxel_size_yx=image.scale[2],
-        psf_z=psf_z,
-        psf_yx=psf_yx,
-    )
-    print(threshold)
-    return LayerDataTuple((spots, {"name": "Spots", "scale": image.scale[1:]}, "points"))
+def _spot_detect_big_fish(image: Image, psf_z: float = 400, psf_yx: float = 100) -> LayerDataTuple:
+    sigma = stack.get_sigma(image.scale[1], image.scale[2], psf_z, psf_yx)
+    yield
+    image_filtered = stack.log_filter(image.data.squeeze(), sigma)
+    yield
+    mask_local_max = detection.local_maximum_detection(image_filtered, sigma)
+    yield
+    threshold = detection.automated_threshold_setting(image_filtered, mask_local_max)
+    yield
+    spots, _ = detection.spots_thresholding(image_filtered, mask_local_max, threshold)
+    yield LayerDataTuple((spots, {"name": "Spots", "scale": image.scale[1:]}, "points"))
+
+
+def spot_detect_big_fish(image: Image, psf_z: float = 400, psf_yx: float = 308) -> LayerDataTuple:
+    for el in progress(_spot_detect_big_fish(image, psf_z, psf_yx)):
+        print(el)
+    return el
