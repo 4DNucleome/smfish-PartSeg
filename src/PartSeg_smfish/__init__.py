@@ -3,6 +3,7 @@ import sys
 from napari_plugin_engine import napari_hook_implementation
 
 from . import segmentation
+from .big_fish import spot_detect
 from .copy_labels import CopyLabelWidget
 from .segmentation import gauss_background_estimate, laplacian_check, laplacian_estimate, maximum_projection
 from .verify_points import find_single_points, verify_segmentation
@@ -52,6 +53,11 @@ def napari_experimental_provide_function3():
 @napari_hook_implementation(specname="napari_experimental_provide_function")
 def napari_experimental_provide_function4():
     return maximum_projection
+
+
+@napari_hook_implementation(specname="napari_experimental_provide_function")
+def napari_experimental_provide_function5():
+    return spot_detect
 
 
 @napari_hook_implementation(specname="napari_experimental_provide_dock_widget")
