@@ -15,6 +15,8 @@ if "reload" in globals():
 
 reload = False
 
+_hiddentimports = ["sklearn.neighbors._partition_nodes"]
+
 
 def register():
     from PartSegCore.register import RegisterEnum
