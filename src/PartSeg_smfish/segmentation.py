@@ -139,6 +139,7 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
                 value_type=AlgorithmDescribeBase,
             ),
             AlgorithmProperty("minimum_molecule_size", "Minimum molecule size (px)", 5, (0, 10 ** 6), 1000),
+            AlgorithmProperty("normalize", "Normalize", False),
         ]
 
 
@@ -149,19 +150,24 @@ class SMSegmentation(SMSegmentationBase):
 
     def background_estimate(self, channel: np.ndarray) -> np.ndarray:
         mask = self.mask if self.mask is not None else channel > 0
-        return _gauss_background_estimate(
+        gaussian = _gauss_background_estimate(
             channel,
             mask,
             self.image.spacing,
             self.new_parameters["background_estimate_radius"],
             self.new_parameters["foreground_estimate_radius"],
         )
+        if self.new_parameters["normalize"]:
+            shift = np.mean(gaussian)
+            std = np.std(gaussian)
+            return (gaussian - shift) / (std)
+        return gaussian
 
     @classmethod
     def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
         res = super().get_fields()
         res.insert(
-            -2,
+            -3,
             AlgorithmProperty(
                 "background_estimate_radius",
                 "Background estimate radius",
@@ -170,7 +176,7 @@ class SMSegmentation(SMSegmentationBase):
             ),
         )
         res.insert(
-            -2,
+            -3,
             AlgorithmProperty(
                 "foreground_estimate_radius",
                 "Foreground estimate radius",
@@ -188,13 +194,18 @@ class SMLaplacianSegmentation(SMSegmentationBase):
 
     def background_estimate(self, channel: np.ndarray) -> np.ndarray:
         mask = self.mask if self.mask is not None else channel > 0
-        return _laplacian_estimate(channel, mask, self.new_parameters["laplacian_radius"])
+        laplacian = _laplacian_estimate(channel, mask, self.new_parameters["laplacian_radius"])
+        if self.new_parameters["normalize"]:
+            shift = np.mean(laplacian)
+            std = np.std(laplacian)
+            return (laplacian - shift) / (std)
+        return laplacian
 
     @classmethod
     def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
         res = super().get_fields()
         res.insert(
-            -2,
+            -3,
             AlgorithmProperty(
                 "laplacian_radius",
                 "Laplacian radius",
@@ -210,14 +221,14 @@ def gauss_background_estimate(
     mask: Labels,
     background_gauss_radius: float = 5,
     foreground_gauss_radius: float = 2.5,
-    remove_negative: bool = False,
+    clip_bellow_0: bool = True,
 ) -> LayerDataTuple:
     # process the image
     mask = mask.data if mask is not None else np.ones(image.data.shape, dtype=np.uint8)
     resp = _gauss_background_estimate(
         image.data[0], mask[0], image.scale[1:], background_gauss_radius, foreground_gauss_radius
     )
-    if remove_negative:
+    if clip_bellow_0:
         resp[resp < 0] = 0
     resp = resp.reshape((1,) + resp.shape)
     # return it + some layer properties

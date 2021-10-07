@@ -2,7 +2,7 @@ import sys
 
 from napari_plugin_engine import napari_hook_implementation
 
-from . import segmentation
+from . import measurement, segmentation
 from .big_fish import spot_detect_big_fish
 from .copy_labels import CopyLabelWidget
 from .segmentation import gauss_background_estimate, laplacian_check, laplacian_estimate, maximum_projection
@@ -25,6 +25,7 @@ def register():
     register_fun(segmentation.SMSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
     register_fun(segmentation.SMLaplacianSegmentation, RegisterEnum.roi_analysis_segmentation_algorithm)
     register_fun(segmentation.LayerRangeThresholdFlow, RegisterEnum.roi_mask_segmentation_algorithm)
+    register_fun(measurement.ComponentType, RegisterEnum.analysis_measurement)
 
     if getattr(sys, "frozen", False):
         import napari
