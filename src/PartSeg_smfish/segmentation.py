@@ -1,5 +1,6 @@
 import operator
 import typing
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Callable, List, Tuple, Union
 
@@ -8,7 +9,7 @@ import SimpleITK
 from napari.layers import Image, Labels
 from napari.types import LayerDataTuple
 
-from PartSegCore.algorithm_describe_base import AlgorithmDescribeBase, AlgorithmProperty, ROIExtractionProfile
+from PartSegCore.algorithm_describe_base import AlgorithmDescribeBase, AlgorithmProperty, Register, ROIExtractionProfile
 from PartSegCore.channel_class import Channel
 from PartSegCore.convex_fill import convex_fill
 from PartSegCore.image_operations import gaussian
@@ -20,6 +21,92 @@ from PartSegCore.segmentation.threshold import BaseThreshold, threshold_dict
 from PartSegImage import Image as PSImage
 
 
+class SpotDetect(AlgorithmDescribeBase, ABC):
+    @classmethod
+    @abstractmethod
+    def spot_estimate(cls, array, mask, spacing, parameters):
+        pass
+
+
+class GaussBackgroundEstimate(SpotDetect):
+    @classmethod
+    def spot_estimate(cls, array, mask, spacing, parameters):
+        if not parameters["estimate_mask"]:
+            return _gauss_background_estimate(
+                array,
+                spacing,
+                parameters["background_estimate_radius"],
+                parameters["foreground_estimate_radius"],
+            )
+
+        mask = mask if mask is not None else array > 0
+        return _gauss_background_estimate_mask(
+            array,
+            mask,
+            spacing,
+            parameters["background_estimate_radius"],
+            parameters["foreground_estimate_radius"],
+        )
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "Gaussian spot estimate"
+
+    @classmethod
+    def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
+        return [
+            AlgorithmProperty(
+                "background_estimate_radius",
+                "Background estimate radius",
+                5.0,
+                (0, 20),
+            ),
+            AlgorithmProperty(
+                "foreground_estimate_radius",
+                "Foreground estimate radius",
+                2.5,
+                (0, 20),
+            ),
+            AlgorithmProperty(
+                "estimate_mask",
+                "Estimate background outside mask",
+                True,
+            ),
+        ]
+
+
+class LaplacianBackgroundEstimate(SpotDetect):
+    @classmethod
+    def spot_estimate(cls, array, mask, spacing, parameters):
+        if not parameters["estimate_mask"]:
+            return _laplacian_estimate(array, parameters["laplacian_radius"])
+        mask = mask if mask is not None else array > 0
+        return _laplacian_estimate_mask(array, mask, parameters["laplacian_radius"])
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "Laplacian spot estimate"
+
+    @classmethod
+    def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
+        return [
+            AlgorithmProperty(
+                "laplacian_radius",
+                "Laplacian radius",
+                1.3,
+                (0, 20),
+            ),
+            AlgorithmProperty(
+                "estimate_mask",
+                "Estimate background outside mask",
+                True,
+            ),
+        ]
+
+
+spot_extraction_dict = Register(GaussBackgroundEstimate, LaplacianBackgroundEstimate)
+
+
 class SMSegmentationBase(ROIExtractionAlgorithm):
     @classmethod
     def support_time(cls):
@@ -29,8 +116,9 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
     def support_z(cls):
         return True
 
-    def background_estimate(self, channel: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+    @classmethod
+    def get_name(cls) -> str:
+        return "sm-fish spot segmentation"
 
     def calculation_run(self, report_fun: Callable[[str, int], None]) -> SegmentationResult:
         channel_nuc = self.get_channel(self.new_parameters["channel_nuc"])
@@ -49,7 +137,10 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
         nucleus_segmentation = convex_fill(nucleus_segmentation)
 
         channel_molecule = self.get_channel(self.new_parameters["channel_molecule"])
-        estimated = self.background_estimate(channel_molecule)
+        background_estimate: SpotDetect = spot_extraction_dict[self.new_parameters["spot_method"]["name"]]
+        estimated = background_estimate.spot_estimate(
+            channel_molecule, self.mask, self.image.spacing, self.new_parameters["spot_method"]["values"]
+        )
         if self.mask is not None:
             estimated[self.mask == 0] = 0
         thr: BaseThreshold = threshold_dict[self.new_parameters["molecule_threshold"]["name"]]
@@ -130,6 +221,13 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
                 value_type=AlgorithmDescribeBase,
             ),
             AlgorithmProperty("minimum_nucleus_size", "Minimum nucleus size (px)", 500, (0, 10 ** 6), 1000),
+            AlgorithmProperty(
+                "spot_method",
+                "Spot method",
+                next(iter(spot_extraction_dict.keys())),
+                possible_values=spot_extraction_dict,
+                value_type=AlgorithmDescribeBase,
+            ),
             AlgorithmProperty("channel_molecule", "Channel molecule", 1, value_type=Channel),
             AlgorithmProperty(
                 "molecule_threshold",
@@ -139,81 +237,7 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
                 value_type=AlgorithmDescribeBase,
             ),
             AlgorithmProperty("minimum_molecule_size", "Minimum molecule size (px)", 5, (0, 10 ** 6), 1000),
-            AlgorithmProperty("normalize", "Normalize", False),
         ]
-
-
-class SMSegmentation(SMSegmentationBase):
-    @classmethod
-    def get_name(cls) -> str:
-        return "sm-fish segmentation"
-
-    def background_estimate(self, channel: np.ndarray) -> np.ndarray:
-        mask = self.mask if self.mask is not None else channel > 0
-        gaussian = _gauss_background_estimate(
-            channel,
-            mask,
-            self.image.spacing,
-            self.new_parameters["background_estimate_radius"],
-            self.new_parameters["foreground_estimate_radius"],
-        )
-        if self.new_parameters["normalize"]:
-            shift = np.mean(gaussian)
-            std = np.std(gaussian)
-            return (gaussian - shift) / (std)
-        return gaussian
-
-    @classmethod
-    def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
-        res = super().get_fields()
-        res.insert(
-            -3,
-            AlgorithmProperty(
-                "background_estimate_radius",
-                "Background estimate radius",
-                5.0,
-                (0, 20),
-            ),
-        )
-        res.insert(
-            -3,
-            AlgorithmProperty(
-                "foreground_estimate_radius",
-                "Foreground estimate radius",
-                2.5,
-                (0, 20),
-            ),
-        )
-        return res
-
-
-class SMLaplacianSegmentation(SMSegmentationBase):
-    @classmethod
-    def get_name(cls) -> str:
-        return "sm-fish laplacian segmentation"
-
-    def background_estimate(self, channel: np.ndarray) -> np.ndarray:
-        mask = self.mask if self.mask is not None else channel > 0
-        laplacian = _laplacian_estimate(channel, mask, self.new_parameters["laplacian_radius"])
-        if self.new_parameters["normalize"]:
-            shift = np.mean(laplacian)
-            std = np.std(laplacian)
-            return (laplacian - shift) / (std)
-        return laplacian
-
-    @classmethod
-    def get_fields(cls) -> typing.List[typing.Union[AlgorithmProperty, str]]:
-        res = super().get_fields()
-        res.insert(
-            -3,
-            AlgorithmProperty(
-                "laplacian_radius",
-                "Laplacian radius",
-                1.3,
-                (0, 20),
-            ),
-        )
-        return res
 
 
 def gauss_background_estimate(
@@ -225,7 +249,7 @@ def gauss_background_estimate(
 ) -> LayerDataTuple:
     # process the image
     mask = mask.data if mask is not None else np.ones(image.data.shape, dtype=np.uint8)
-    resp = _gauss_background_estimate(
+    resp = _gauss_background_estimate_mask(
         image.data[0], mask[0], image.scale[1:], background_gauss_radius, foreground_gauss_radius
     )
     if clip_bellow_0:
@@ -235,7 +259,7 @@ def gauss_background_estimate(
     return LayerDataTuple((resp, {"colormap": "gray", "scale": image.scale, "name": "Signal estimate"}))
 
 
-def _gauss_background_estimate(
+def _gauss_background_estimate_mask(
     channel: np.ndarray,
     mask: np.ndarray,
     scale: Union[List[float], Tuple[Union[float, int]]],
@@ -247,33 +271,49 @@ def _gauss_background_estimate(
     data[mask == 0] = mean_background
     data = gaussian(data, 15, False)
     data[mask > 0] = channel[mask > 0]
-    background_estimate = GaussNoiseFiltering.noise_filter(
-        data, scale, {"dimension_type": DimensionType.Layer, "radius": background_gauss_radius}
-    )
-    foreground_estimate = GaussNoiseFiltering.noise_filter(
-        data, scale, {"dimension_type": DimensionType.Layer, "radius": foreground_gauss_radius}
-    )
-    resp = foreground_estimate - background_estimate
+    resp = _gauss_background_estimate(data, scale, background_gauss_radius, foreground_gauss_radius)
     resp[mask == 0] = 0
     return resp
 
 
+def _gauss_background_estimate(
+    channel: np.ndarray,
+    scale: Union[List[float], Tuple[Union[float, int]]],
+    background_gauss_radius: float,
+    foreground_gauss_radius: float,
+) -> np.ndarray:
+    channel = channel.astype(float)
+    background_estimate = GaussNoiseFiltering.noise_filter(
+        channel, scale, {"dimension_type": DimensionType.Layer, "radius": background_gauss_radius}
+    )
+    foreground_estimate = GaussNoiseFiltering.noise_filter(
+        channel, scale, {"dimension_type": DimensionType.Layer, "radius": foreground_gauss_radius}
+    )
+    return foreground_estimate - background_estimate
+
+
 def laplacian_estimate(image: Image, mask: Labels, radius=1.30, clip_bellow_0=True) -> LayerDataTuple:
     mask = mask.data if mask is not None else np.ones(image.data.shape, dtype=np.uint8)
-    res = _laplacian_estimate(image.data[0], mask[0], radius=radius)
+    res = _laplacian_estimate_mask(image.data[0], mask[0], radius=radius)
     if clip_bellow_0:
         res[res < 0] = 0
     res = res.reshape(image.data.shape)
     return LayerDataTuple((res, {"colormap": "magma", "scale": image.scale, "name": "Laplacian estimate"}))
 
 
-def _laplacian_estimate(channel: np.ndarray, mask: np.ndarray, radius=1.30) -> np.ndarray:
+def _laplacian_estimate_mask(channel: np.ndarray, mask: np.ndarray, radius=1.30) -> np.ndarray:
     data = channel.astype(np.float64)
     mean_background = np.mean(data[mask > 0])
     data[mask == 0] = mean_background
     data = gaussian(data, 15, False)
     data[mask > 0] = channel[mask > 0]
-    return -SimpleITK.GetArrayFromImage(SimpleITK.LaplacianRecursiveGaussian(SimpleITK.GetImageFromArray(data), radius))
+    return _laplacian_estimate(data, radius)
+
+
+def _laplacian_estimate(channel: np.ndarray, radius=1.30) -> np.ndarray:
+    return -SimpleITK.GetArrayFromImage(
+        SimpleITK.LaplacianRecursiveGaussian(SimpleITK.GetImageFromArray(channel), radius)
+    )
 
 
 def laplacian_check(image: Image, mask: Labels, radius=1.0, threshold=10.0, min_size=50) -> LayerDataTuple:
