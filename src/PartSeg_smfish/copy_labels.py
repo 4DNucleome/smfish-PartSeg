@@ -77,7 +77,7 @@ class CopyLabelWidget(QWidget):
             self.checkbox_layout.addWidget(chk)
 
     def copy_action(self):
-        layer = self.viewer.active_layer
+        layer = self.viewer.layers.selection.active
         if layer is None:
             return
 
@@ -92,6 +92,6 @@ class CopyLabelWidget(QWidget):
         for component_num in checked:
             mask = layer.data[0, z_position] == component_num
             start = max(0, self.lower.value())
-            end = min(layer.data.shape[1]-1, self.upper.value()) + 1
+            end = min(layer.data.shape[1] - 1, self.upper.value()) + 1
             for i in range(start, end):
                 layer.data[0, i][mask] = component_num
