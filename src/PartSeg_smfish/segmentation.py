@@ -138,9 +138,11 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
 
         channel_molecule = self.get_channel(self.new_parameters["channel_molecule"])
         background_estimate: SpotDetect = spot_extraction_dict[self.new_parameters["spot_method"]["name"]]
+
         estimated = background_estimate.spot_estimate(
             channel_molecule, self.mask, self.image.spacing, self.new_parameters["spot_method"]["values"]
         )
+        estimated = estimated / np.std(estimated)
         if self.mask is not None:
             estimated[self.mask == 0] = 0
         thr: BaseThreshold = threshold_dict[self.new_parameters["molecule_threshold"]["name"]]
