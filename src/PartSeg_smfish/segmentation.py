@@ -135,6 +135,8 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
             SimpleITK.RelabelComponent(nucleus_connect, self.new_parameters["minimum_nucleus_size"])
         )
         nucleus_segmentation = convex_fill(nucleus_segmentation)
+        if self.new_parameters["leave_the_biggest"]:
+            nucleus_segmentation[nucleus_segmentation > 1] = 0
 
         channel_molecule = self.get_channel(self.new_parameters["channel_molecule"])
         background_estimate: SpotDetect = spot_extraction_dict[self.new_parameters["spot_method"]["name"]]
@@ -195,7 +197,7 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
                 "position": AdditionalLayerDescription(data=position_array, layer_type="labels"),
             },
             roi_annotation=annotation,
-            alternative_representation={"position": position_array},
+            alternative_representation={"position": position_array, "nucleus": nucleus_segmentation},
         )
 
     def get_info_text(self):
@@ -223,6 +225,7 @@ class SMSegmentationBase(ROIExtractionAlgorithm):
                 value_type=AlgorithmDescribeBase,
             ),
             AlgorithmProperty("minimum_nucleus_size", "Minimum nucleus size (px)", 500, (0, 10 ** 6), 1000),
+            AlgorithmProperty("leave_the_biggest", "Biggest as nucleus", True),
             AlgorithmProperty(
                 "spot_method",
                 "Spot method",
