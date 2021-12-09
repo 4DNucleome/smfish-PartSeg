@@ -4,7 +4,7 @@ from typing import Callable
 from bigfish import detection, stack
 from napari.layers import Image
 from napari.types import LayerDataTuple
-from napari.qt import progress
+from napari.utils import progress
 
 from PartSegCore.algorithm_describe_base import AlgorithmProperty, ROIExtractionProfile
 from PartSegCore.segmentation import ROIExtractionAlgorithm, ROIExtractionResult
