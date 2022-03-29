@@ -81,6 +81,7 @@ class CopyLabelWidget(QWidget):
         if layer is None:
             return
 
+        leading_zeros = (0,) * (layer.dtype.ndim - 3)
         checked = set()
         for i in range(self.checkbox_layout.count()):
             w: QCheckBox = self.checkbox_layout.itemAt(i).widget()
@@ -88,10 +89,10 @@ class CopyLabelWidget(QWidget):
                 checked.add(int(w.text()))
         if not checked:
             checked = {layer.selected_label}
-        z_position = self.viewer.dims.current_step[1]
+        z_position = self.viewer.dims.current_step[layer.dtype.ndim - 3]
         for component_num in checked:
-            mask = layer.data[0, z_position] == component_num
+            mask = layer.data[leading_zeros + (z_position,)] == component_num
             start = max(0, self.lower.value())
             end = min(layer.data.shape[1] - 1, self.upper.value()) + 1
             for i in range(start, end):
-                layer.data[0, i][mask] = component_num
+                layer.data[leading_zeros + (i,)][mask] = component_num
