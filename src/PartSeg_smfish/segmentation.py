@@ -415,7 +415,10 @@ class LayerRangeThresholdFlow(StackAlgorithm):
 
 
 def maximum_projection(
-    image: Image, lower_layer: int = 0, upper_layer: int = 1, axis_num: int = PSImage.get_array_axis_positions()["Z"]
+    image: Image,
+    lower_layer: int = 0,
+    upper_layer: int = 1,
+    axis_num: int = PSImage.axis_order.replace("C", "").index("Z"),
 ) -> LayerDataTuple:
     data = image.data
     slice_arr = [slice(None) for _ in data.shape]
