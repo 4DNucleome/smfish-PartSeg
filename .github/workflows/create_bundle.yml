@@ -1,7 +1,8 @@
 name: create_bundle
 
 on:
-  push
+  push:
+  workflow_dispatch:
 
 jobs:
   bundle:
